@@ -8,11 +8,12 @@ use std::process;
 use std::env;
 use std::fs::File;
 use std::io::BufReader;
+use std::io::prelude::*;
 
-use flate2::read::GzEncoder;
+use flate2::bufread::GzEncoder;
 use flate2::Compression;
 
-use reqwest::{Body, StatusCode};
+use reqwest::StatusCode;
 use reqwest::header::{Headers, UserAgent, ContentEncoding, Encoding};
 
 const USER_AGENT : &str = "pingsender/1.0";
@@ -20,6 +21,8 @@ const CUSTOM_VERSION_HEADER : &str = "X-PingSenderVersion";
 const CUSTOM_VERSION: &str = "1.0";
 
 fn main() {
+    env_logger::init();
+
     match run() {
         Ok(()) => {},
         Err(e) => {
@@ -42,7 +45,9 @@ fn run() -> Result<(), &'static str> {
     let reader = BufReader::new(f);
 
     let level = Compression::new(6); // default compression level
-    let gz = GzEncoder::new(reader, level);
+    let mut gz = GzEncoder::new(reader, level);
+    let mut buffer = Vec::new();
+    gz.read_to_end(&mut buffer).map_err(|_| "Could not read ping file")?;
 
     let mut headers = Headers::new();
     headers.set(UserAgent::new(USER_AGENT));
@@ -52,7 +57,7 @@ fn run() -> Result<(), &'static str> {
     let client = reqwest::Client::new();
     let res = client.post(url)
             .headers(headers)
-            .body(Body::new(gz))
+            .body(buffer)
             .send().map_err(|_| "Could not send HTTP request")?;
 
     if res.status() == StatusCode::Ok {
