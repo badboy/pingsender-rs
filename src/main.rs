@@ -18,7 +18,7 @@ use reqwest::StatusCode;
 use reqwest::header::{Headers, UserAgent, ContentEncoding, Encoding, Date, HttpDate};
 
 const USER_AGENT : &str = "pingsender/1.0";
-const CUSTOM_VERSION_HEADER : &str = "X-PingSenderVersion";
+const CUSTOM_VERSION_HEADER : &str = "X-PingSender-Version";
 const CUSTOM_VERSION: &[u8] = b"1.0";
 
 fn main() {
