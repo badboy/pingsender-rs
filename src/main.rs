@@ -1,26 +1,25 @@
 extern crate reqwest;
 extern crate flate2;
-extern crate time;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
 
 use std::process;
 use std::env;
-use std::time::Duration;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::BufReader;
 use std::io::prelude::*;
+use std::time::Duration;
 
 use flate2::bufread::GzEncoder;
 use flate2::Compression;
 
 use reqwest::StatusCode;
-use reqwest::header::{Headers, UserAgent, ContentEncoding, Encoding, Date, HttpDate};
+use reqwest::header::{Headers, UserAgent, ContentEncoding, Encoding};
 
 const USER_AGENT : &str = "pingsender/1.0";
 const CUSTOM_VERSION_HEADER : &str = "X-PingSender-Version";
-const CUSTOM_VERSION: &[u8] = b"1.0";
+const CUSTOM_VERSION: &str = "1.0";
 const CONNECTION_TIMEOUT_MS : u64 = 30 * 1000;
 
 fn main() {
@@ -53,20 +52,21 @@ fn run() -> Result<(), &'static str> {
     gz.read_to_end(&mut buffer).map_err(|_| "Could not read ping file")?;
 
     let mut headers = Headers::new();
-    headers.set(UserAgent(USER_AGENT.to_string()));
+    headers.set(UserAgent::new(USER_AGENT));
     headers.set(ContentEncoding(vec![Encoding::Gzip]));
-    headers.set(Date(HttpDate(time::now())));
-    headers.set_raw(CUSTOM_VERSION_HEADER, vec![CUSTOM_VERSION.to_vec()]);
+    headers.set_raw(CUSTOM_VERSION_HEADER, CUSTOM_VERSION);
 
-    let mut client = reqwest::Client::new().map_err(|_| "Can't create HTTP client")?;
-    client.timeout(Duration::from_millis(CONNECTION_TIMEOUT_MS));
+    let client = reqwest::ClientBuilder::new()
+        .timeout(Duration::from_millis(CONNECTION_TIMEOUT_MS))
+        .build()
+        .map_err(|_| "Could not create HTTP client")?;
     let res = client.post(url)
             .headers(headers)
             .body(buffer)
             .send().map_err(|_| "Could not send HTTP request")?;
 
-    if *res.status() == StatusCode::Ok {
-        fs::remove_file(path).map_err(|_| "Could not remove ping file")
+    if res.status() == StatusCode::Ok {
+        Ok(())
     } else {
         Err("Failed to send HTTP request")
     }
