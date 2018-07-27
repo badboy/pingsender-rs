@@ -4,7 +4,8 @@ version = "0.1.0"
 authors = ["Jan-Erik Rediger <janerik@fnordig.de>"]
 
 [dependencies]
-reqwest = "0.8.5"
+hyper = "=0.10.13"
+hyper-rustls = "=0.6.0"
 flate2 = "1.0.1"
 log = "0.4.1"
 env_logger = "0.5.6"

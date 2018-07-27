@@ -1,4 +1,5 @@
-extern crate reqwest;
+extern crate hyper;
+extern crate hyper_rustls;
 extern crate flate2;
 #[macro_use]
 extern crate log;
@@ -9,17 +10,20 @@ use std::env;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::prelude::*;
+use std::io::Cursor;
 use std::time::Duration;
 
 use flate2::bufread::GzEncoder;
 use flate2::Compression;
 
-use reqwest::StatusCode;
-use reqwest::header::{Headers, UserAgent, ContentEncoding, Encoding};
+use hyper::{Client, Url};
+use hyper::header::{Headers, UserAgent, ContentEncoding, Encoding};
+use hyper::net::HttpsConnector;
+use hyper::status::StatusCode;
 
 const USER_AGENT : &str = "pingsender/1.0";
 const CUSTOM_VERSION_HEADER : &str = "X-PingSender-Version";
-const CUSTOM_VERSION: &str = "1.0";
+const CUSTOM_VERSION: &[u8] = b"1.0";
 const CONNECTION_TIMEOUT_MS : u64 = 30 * 1000;
 
 fn main() {
@@ -40,7 +44,7 @@ fn run() -> Result<(), &'static str> {
         return Err("Usage pingsender URL PATH");
     }
 
-    let url = &args[0];
+    let url = Url::parse(&args[0]).map_err(|_| "Could not parse URL")?;
     let path = &args[1];
 
     let f = File::open(path).map_err(|_| "Could not open ping file")?;
@@ -51,21 +55,31 @@ fn run() -> Result<(), &'static str> {
     let mut buffer = Vec::new();
     gz.read_to_end(&mut buffer).map_err(|_| "Could not read ping file")?;
 
-    let mut headers = Headers::new();
-    headers.set(UserAgent::new(USER_AGENT));
-    headers.set(ContentEncoding(vec![Encoding::Gzip]));
-    headers.set_raw(CUSTOM_VERSION_HEADER, CUSTOM_VERSION);
+    let mut client = match url.scheme() {
+        "http" => Client::new(),
+        "https" => {
+            let tls = hyper_rustls::TlsClient::new();
+            hyper::Client::with_connector(HttpsConnector::new(tls))
+        },
+        _ => return Err("Unsupported scheme in URL"),
+    };
 
-    let client = reqwest::ClientBuilder::new()
-        .timeout(Duration::from_millis(CONNECTION_TIMEOUT_MS))
-        .build()
-        .map_err(|_| "Could not create HTTP client")?;
+    let mut headers = Headers::new();
+    headers.set(UserAgent(USER_AGENT.into()));
+    headers.set(ContentEncoding(vec![Encoding::Gzip]));
+    headers.set_raw(CUSTOM_VERSION_HEADER, vec![CUSTOM_VERSION.to_vec()]);
+
+
+    let duration = Duration::from_millis(CONNECTION_TIMEOUT_MS);
+    client.set_read_timeout(Some(duration));
+    client.set_write_timeout(Some(duration));
+
     let res = client.post(url)
             .headers(headers)
-            .body(buffer)
+            .body(&mut Cursor::new(buffer))
             .send().map_err(|_| "Could not send HTTP request")?;
 
-    if res.status() == StatusCode::Ok {
+    if res.status == StatusCode::Ok {
         Ok(())
     } else {
         Err("Failed to send HTTP request")
