@@ -14,10 +14,10 @@ use std::time::Duration;
 use flate2::bufread::GzEncoder;
 use flate2::Compression;
 
-use reqwest::StatusCode;
-use reqwest::header::{Headers, UserAgent, ContentEncoding, Encoding};
+use reqwest::header::{self, HeaderMap, HeaderValue};
 
 const USER_AGENT : &str = "pingsender/1.0";
+const CONTENT_ENCODING : &str = "gzip";
 const CUSTOM_VERSION_HEADER : &str = "X-PingSender-Version";
 const CUSTOM_VERSION: &str = "1.0";
 const CONNECTION_TIMEOUT_MS : u64 = 30 * 1000;
@@ -51,10 +51,10 @@ fn run() -> Result<(), &'static str> {
     let mut buffer = Vec::new();
     gz.read_to_end(&mut buffer).map_err(|_| "Could not read ping file")?;
 
-    let mut headers = Headers::new();
-    headers.set(UserAgent::new(USER_AGENT));
-    headers.set(ContentEncoding(vec![Encoding::Gzip]));
-    headers.set_raw(CUSTOM_VERSION_HEADER, CUSTOM_VERSION);
+    let mut headers = HeaderMap::new();
+    headers.insert(header::USER_AGENT, HeaderValue::from_static(USER_AGENT));
+    headers.insert(header::CONTENT_ENCODING, HeaderValue::from_static(CONTENT_ENCODING));
+    headers.insert(CUSTOM_VERSION_HEADER, HeaderValue::from_static(CUSTOM_VERSION));
 
     let client = reqwest::ClientBuilder::new()
         .timeout(Duration::from_millis(CONNECTION_TIMEOUT_MS))
@@ -65,7 +65,7 @@ fn run() -> Result<(), &'static str> {
             .body(buffer)
             .send().map_err(|_| "Could not send HTTP request")?;
 
-    if res.status() == StatusCode::Ok {
+    if res.status().is_success() {
         Ok(())
     } else {
         Err("Failed to send HTTP request")
