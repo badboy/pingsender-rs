@@ -8,6 +8,7 @@ license = "MPL-2.0"
 
 [[bin]]
 name = "pingsender"
+path = "src/main.rs"
 
 [dependencies]
 log = "0.4.1"
