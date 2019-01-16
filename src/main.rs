@@ -3,6 +3,7 @@ extern crate flate2;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate time;
 
 use std::process;
 use std::env;
@@ -54,6 +55,8 @@ fn run() -> Result<(), &'static str> {
     let mut headers = HeaderMap::new();
     headers.insert(header::USER_AGENT, HeaderValue::from_static(USER_AGENT));
     headers.insert(header::CONTENT_ENCODING, HeaderValue::from_static(CONTENT_ENCODING));
+    let date = format!("{}", time::now().rfc822());
+    headers.insert(header::DATE, HeaderValue::from_str(&date).unwrap());
     headers.insert(CUSTOM_VERSION_HEADER, HeaderValue::from_static(CUSTOM_VERSION));
 
     let client = reqwest::ClientBuilder::new()

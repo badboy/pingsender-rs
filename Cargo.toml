@@ -12,6 +12,7 @@ name = "pingsender"
 [dependencies]
 log = "0.4.1"
 env_logger = "0.5.6"
+time = "0.1"
 
 [dependencies.flate2]
 version = "1.0"
