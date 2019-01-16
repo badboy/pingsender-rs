@@ -1,7 +1,13 @@
 [package]
 name = "pingsender-rs"
 version = "0.1.0"
-authors = ["Jan-Erik Rediger <janerik@fnordig.de>"]
+authors = ["Jan-Erik Rediger <jrediger@mozilla.com>"]
+description = "A minimalistic program whose sole purpose is to deliver a telemetry ping"
+repository = "https://hg.mozilla.org/mozilla-central/file/tip/toolkit/components/telemetry/pingsender"
+license = "MPL-2.0"
+
+[[bin]]
+name = "pingsender"
 
 [dependencies]
 log = "0.4.1"
