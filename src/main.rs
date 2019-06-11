@@ -1,33 +1,28 @@
-extern crate reqwest;
-extern crate flate2;
-#[macro_use]
-extern crate log;
-extern crate env_logger;
-extern crate time;
-
-use std::process;
 use std::env;
 use std::fs::File;
-use std::io::BufReader;
 use std::io::prelude::*;
+use std::io::BufReader;
+use std::process;
 use std::time::Duration;
 
 use flate2::bufread::GzEncoder;
 use flate2::Compression;
+use log::warn;
 
-use reqwest::header::{self, HeaderMap, HeaderValue};
+use chttp::http::Request;
+use chttp::options::Options;
 
-const USER_AGENT : &str = "pingsender/1.0";
-const CONTENT_ENCODING : &str = "gzip";
-const CUSTOM_VERSION_HEADER : &str = "X-PingSender-Version";
+const USER_AGENT: &str = "pingsender/1.0";
+const CONTENT_ENCODING: &str = "gzip";
+const CUSTOM_VERSION_HEADER: &str = "X-PingSender-Version";
 const CUSTOM_VERSION: &str = "1.0";
-const CONNECTION_TIMEOUT_MS : u64 = 30 * 1000;
+const CONNECTION_TIMEOUT_MS: u64 = 30 * 1000;
 
 fn main() {
     env_logger::init();
 
     match run() {
-        Ok(()) => {},
+        Ok(()) => {}
         Err(e) => {
             warn!("{}", e);
             process::exit(1);
@@ -50,23 +45,25 @@ fn run() -> Result<(), &'static str> {
     let level = Compression::new(6); // default compression level
     let mut gz = GzEncoder::new(reader, level);
     let mut buffer = Vec::new();
-    gz.read_to_end(&mut buffer).map_err(|_| "Could not read ping file")?;
+    gz.read_to_end(&mut buffer)
+        .map_err(|_| "Could not read ping file")?;
 
-    let mut headers = HeaderMap::new();
-    headers.insert(header::USER_AGENT, HeaderValue::from_static(USER_AGENT));
-    headers.insert(header::CONTENT_ENCODING, HeaderValue::from_static(CONTENT_ENCODING));
-    let date = format!("{}", time::now().rfc822());
-    headers.insert(header::DATE, HeaderValue::from_str(&date).unwrap());
-    headers.insert(CUSTOM_VERSION_HEADER, HeaderValue::from_static(CUSTOM_VERSION));
-
-    let client = reqwest::ClientBuilder::new()
-        .timeout(Duration::from_millis(CONNECTION_TIMEOUT_MS))
+    let client = chttp::Client::builder()
+        .options(
+            Options::default().with_timeout(Some(Duration::from_millis(CONNECTION_TIMEOUT_MS))),
+        )
         .build()
         .map_err(|_| "Could not create HTTP client")?;
-    let res = client.post(url)
-            .headers(headers)
-            .body(buffer)
-            .send().map_err(|_| "Could not send HTTP request")?;
+
+        let date = format!("{}", time::now().rfc822());
+    let req = Request::post(url)
+        .header("User-Agent", USER_AGENT)
+        .header("Content-Encoding", CONTENT_ENCODING)
+        .header("Date", date)
+        .header(CUSTOM_VERSION_HEADER, CUSTOM_VERSION)
+        .body(buffer).map_err(|_| "Could not create HTTP request")?;
+
+    let res = client.send(req).map_err(|_| "Could not send HTTP request")?;
 
     if res.status().is_success() {
         Ok(())
